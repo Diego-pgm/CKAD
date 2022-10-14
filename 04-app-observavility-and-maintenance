@@ -163,18 +163,168 @@ Steps to Access Data with the Metrics API:
 Hands-On Demo
 --------------
 
-Install the monitoring tool
+1. Install the monitoring tool
 
 kubectl apply -f https://raw.githubusercontent.com/ACloudGuru-Resources/content-cka-resources/master/metrics-server-components.yaml
 
+2. Create the resource-consumer-pod.yml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: resource-consumer-pod
+spec:
+  containers:
+  - name: resource-consumer
+    image: gcr.io/kubernetes-e2e-test-images/resource-consumer:1.5
+  - name: busybox-sidecar
+    image: radial/busyboxplus:curl
+    command: ['sh', '-c', 'until curl localhost:8080/ConsumeCPU -d "millicores=100&durationSec=3600"; do sleep 5; done && while true; do sleep 10; done']
+
+kubectl apply -f resource-consumer-pod.yml
+
+3. Get the resources
+
+  kubectl top pod
+
+4. Get the nodes
+
+  kubectl top node
+
 Exam Tips
 ----------
+Tip 1: The Kubernetes Metrics API provides metric data about container performance.
+
+Tip 2: You can view Pod metrics using kubectl top pod.
 
 ====
 Accessing Container Logs
 ==========================
 
+Container Logging
+------------------
+
+Kubernetes stores the stdout/stderr console output for each container in the container log.
+
+You can view the log with kubectl logs command.
+
+Hands-On Demo
+--------------
+
+1. Create the logging-pod.yml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: logging-pod
+spec:
+  containers:
+  - name: busybox
+    image: busybox:stable
+    command: ['sh', '-c', 'while true; do echo "Writting to the log!"; sleep 5; done']
+
+kubectl apply -f logging-pod.yml
+
+2. Get the pod's log
+
+  kubectl logs logging-pod
+
+Exam Tips
+----------
+
+Tip 1: Standard/error output for containers is stored in the container log.
+
+Tip 2: You can view the container log using kubectl logs.
+
+Tip 3: For multi-container Pods, use the -c flag to specify which container's logs you want to view.
+
 ====
 Debugging in Kubernetes
 ========================
 
+The Debugging Process
+----------------------
+
+1. Locate
+   
+   Locate the problem. Identify which component(s) may not be working.
+
+2. Gather Info
+
+   Gather information about the broken components to help determine what is wrong.
+
+3. Fix
+
+   Make changes to fix the issue.
+
+Kubernetes Debugging Tips
+--------------------------
+
+1. Check Object Status
+
+   Check the basic status of objects. This can be a quick way to locate a broken Pod in the cluster.
+
+2. Check Object Config
+
+   Use kubectl describe and/or view the full object manifest to understand the relevant object(s) in more detail.
+
+3. Check Logs
+
+   Check container logs, and even cluster-level logs, for more insight into what is going on.   
+
+Hands-On Demo
+--------------
+
+1. Create broken-pod.yml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: broken-pod
+spec:
+  containers:
+  - name: nginx
+    image: nginx:1.20.q
+    livenessProbe:
+      httpGet:
+        path: /
+        port: 81
+      initialDelaySeconds: 3
+      periodSeconds: 3
+
+kubectl apply -f broken-pod.yml
+
+2. Get the pods
+
+3. Describe the pod
+
+  kubectl describe pod broken-pod
+
+* The problem is the image
+
+4. Fix the error and delete and run again
+
+  nginx:1.20.1
+
+* Change image and wait to change port
+
+  port: 80
+
+5. Another place to watch the logs is in /var/log/containers/kube-apiserver[TAB]
+
+  cat /var/log/containers/kube-apiserver
+
+6. Access the logs for Kubernetes
+
+  sudo journalctl -u kubelet
+
+Exam Tips
+----------
+
+Tip 1: Use kubectl get pods to check the status of all Pods in a Namespace. Use the --all-namespaces flag if you don't know what Namespace to look in.
+
+Tip 2: Use kubectl describe to get detailed information about Kubernetes objects.
+
+Tip 3: Use kubectl logs to retrieve container logs.
+
+Tip 4: Check cluster-level logs if you still cannot locate any relevant information.
