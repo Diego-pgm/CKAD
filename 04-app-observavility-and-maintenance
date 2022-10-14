@@ -1,0 +1,155 @@
+Application Observability and Maintenance
+
+Understanding the API Deprecation Policy
+=========================================
+
+The Kubernetes API
+-------------------
+
+The Kubernetes API is the primary interface for Kubernetes
+
+---
+What is Deprecation?
+---------------------
+
+Deprecation is the process of providing advanced warning changes to an API, giving consumers of that API time to update their code and/or processes.
+
+---
+Deprecation Policy Highlights
+------------------------------
+
+1. apiVersion
+
+ The apiVersion field on a Kubernetes object indicates which version of the API it is designed to be compatible with.
+
+2. Deprecation Window
+ 
+ Once deprecated, GA (general availability) released API versions are supported for 12 months or 3 releases (whichever is longer).
+
+3. Migration Guide
+
+ Check the Deprecated API Migration Guide for details on API changes with each version of Kubernetes.
+
+---
+Where to Find Deprecation Info
+-------------------------------
+
+Kubernetes Deprecation Policy: https://kubernetes.io/docs/reference/using-api/deprecation-policy/
+
+---
+Exam Tips
+----------
+
+Tip 1: API deprecation is the process of announcing changes to an API early, giving users time to update their code and/or tools.
+
+Tip 2: Kubernetes removes support deprecated APIs that are in GA (general availability) only after 12 months or 3 Kubernetes releases, whichever is longer
+
+===
+Implementing Probes and Health Checks
+======================================
+
+What is a Probe?
+-----------------
+
+Probes are part of the container spec in Kubernetes. They allow you to customize how Kubernetes detects the state of a container.
+
+Types of Probes
+----------------
+
+1. Liveness
+
+ Liveness probes check whether a container is healthy so that it can be restarted if it becomes unhealthy.
+
+2. Readiness
+
+ Readiness probes determine when a container is fully started up and ready to receive user traffic.
+
+3. Startup
+
+  Startup probes check container health during startup for slow-starting containers.
+
+Hands-On Demo
+--------------
+
+Liveness Probe
+
+1. Create the liveness-pod.yml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: liveness-pod
+spec:
+  containers:
+  - name: busybox
+    image: busybox:stable
+    command: ['sh', '-c', 'while true; do sleep 10; done']
+    livenessProbe:
+      exec:
+        command: ['echo', 'health check!']
+      initalDelaySeconds: 5
+      periodSeconds: 5
+
+kubectl apply -f liveness-pod.yml
+
+kubectl get pod liveness-pod
+
+2. Describe the pod
+
+  kubectl describe pod <livenes-pod-name>
+
+Readiness Probe
+
+1. Create the readiness-probe.yml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: readiness-pod
+spec:
+  containers:
+  - name: nginx
+    image: nginx:1.20.1
+    ports:
+    - containerPort: 80
+    livenessProbe:
+      httpGet:
+        path: /
+        port: 80
+      initialDelaySeconds: 3
+      periodSeconds: 3
+    readinessProbe:
+    httpGet:
+      path: /
+      port: 80
+    initialDelaySeconds: 15
+    periodSeconds: 5
+
+kubectl apply -f readiness-probe.yml
+
+2. Get the readiness pod and wait 15 seconds and try again
+
+ kubectl get pod readiness-pod
+
+
+Exam Tips
+----------
+
+Tip 1: Liveness probes check if a container is healthy so that it can be restarted if it is not.
+
+Tip 2: Readiness probes check whether a container is fully started up and ready to be used.
+
+Tip 3: Probes can run a command inside the container, make an HTTP request, or attempt a TCP socket connection to determine container status.
+
+===
+Monitoring Kubernetes Applications
+====================================
+
+====
+Accessing Container Logs
+==========================
+
+====
+Debugging in Kubernetes
+========================
+

@@ -1,0 +1,463 @@
+Application Deployment
+=======================
+
+Understanding Deployments
+=============================
+
+What is a Deployment?
+----------------------
+
+A Deployment defines a desired state for a set of replica Pods, Kubernetes constantly works to maintain that desired state by creating, deleting, and replacing those Pods.
+
+Replicas
+---------
+
+A deployment manages multiple replica Pods using a Pod template.
+
+The Pod template is the shared configuration used by the Deployment to create new replicas.
+
+A Deployment's replicas field determines the number of replicas.
+
+You can change this value to scale up or down.
+
+Hands-On Demo
+--------------
+
+Create a Deployment
+
+1. Create nginx-deployment.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.14.2
+        ports:
+        - containerPort: 80
+
+kubectl apply -f nginx-deployment
+
+2. Get the deployments
+
+  kubectl get deployments
+
+3. Get the pods 
+  
+  kubectl get pods
+
+4. Scale the deployment
+
+  kubectl scale deployment/nginx-deployment --replicas=4
+
+5. Get the deployments and the pods
+
+  kubectl get deployment nginx-deployment
+  kubectl get pods
+
+6. Edit the deployment to scale to 3 replicas
+
+  kubectl edit deployment nginx-deployment
+
+* Edit under the deployment's spec.
+
+7. Delete a pod
+
+  kubectl delete pod nginx-deployment-<id> --force
+
+8. Get the pods
+
+Exam Tips
+----------
+
+Tip 1: A Deployment actively manages a desired state for a set of replica Pods.
+
+Tip 2: The Pod template provides the Pod configuration that the Deployment will use to create new Pods.
+
+Tip 3: The replicas field sets the number of replicas. We can scale up or down by changing this value
+
+=======
+Performing Rolling Updates
+============================
+
+What is a Rolling Update?
+---------------------------
+
+A rolling update allows you to change a Deployment's Pod template, gradually replacing replicas with zero downtime.
+
+You can use rolling updates to deploy new code!
+
+Hands-On Demo
+--------------
+
+Creating a Rolling Update
+
+1. Create the rolling-deployment.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rolling-deployment
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: rolling
+  template:
+    metadata:
+      labels:
+        app: rolling
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.14.2
+        ports:
+        - containerPort: 80
+
+kubectl apply -f rolling-deployment.yml
+
+2. Get the deployments
+
+  kubectl get deployment rolling-deployment
+
+3. Create a Rolling deployment using the set image cmd
+
+  kubectl set image deployment.v1.apps/rolling-deployment nginx=nginx:1.16.1
+
+  kubectl get pods
+
+4. Check the status of a rollout deployment
+
+  kubectl rollout status deployment/rolling-deployment
+
+* The replicas will run the new image and delete de old replicas.
+
+5. Edit Deployment with edit command
+
+  kubectl edit deployment rollout-deployment
+
+* Edit the image under the pod's spec on the pod's template to nginx:1.20.1
+
+  kubectl rollout status deployment/rolling-deployment
+
+Exam Tips
+----------
+
+Tip 1: A rolling update gradually rolls out changes to a Deployment's Pod template by gradually replacing replicas with new ones.
+
+Tip 2: Use kubectl rollout status to check the status of a rolling update.
+
+Tip 3: Roll back to the latest rolling update with: kubectl rollout undo.
+
+====
+Deploying with Blue/Green and Canary Strategies
+===================================================
+
+What is a Deployment Strategy?
+-------------------------------
+
+A Deployment strategy is a method of rolling out new code that is used to achieve some benefit, such as increasing reliability and minimizing risk.
+
+Blue/Green Deployment
+----------------------
+
+A blue/green deployment strategy involves using 2 identical production environment, usually called blue and green.
+
+New code is rolled out to the second environment. This environment is confirmed to be stable and working before user traffic is directed to the new environment.
+
+Canary Deployment
+------------------
+
+Just like blue/green a canary deployment strategy uses 2 environments.
+
+A portion of the users base is directed to the new code in order to expose any issues before the changes are rolled out to everyone else.
+
+Hands-On Demo
+--------------
+
+Create a Blue/Green Deployment Strategy
+
+1. Create blue-deployment.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blue-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bluegreen-test
+      color: blue
+  template:
+    metadata:
+      labels:
+        app: bluegreen-test
+        color: blue
+    spec:
+      containers:
+      - name: nginx
+        image: linuxacademycontent/ckad-nginx:blue
+        ports:
+        - containerPort: 80
+
+kubectl apply -f blue-deployment.yml
+
+
+2. Create the bluegreen-test-svc
+
+apiVersion: apps/v1
+kind: Service
+metadata:
+  name: bluegreen-test-svc
+spec:
+  selector:
+    app: bluegreen-test
+    color: blue
+  ports:
+  - portocol: TCP
+    port: 80
+    targetPort: 80
+
+kubectl apply -f bluegreen-test-svc
+
+3. Test the service
+
+  kubectl get service bluegreen-test-svc
+
+  curl <SERVICE_CLUSTER_IP>
+
+4. Create green-deployment.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: green-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bluegreen-test
+      color: green
+  template:
+    metadata:
+      labels:
+        app: bluegreen-test
+        color: green
+    spec:
+      containers:
+      - name: nginx
+        image: linuxacademycontent/ckad-nginx:green
+        ports:
+        - containerPort: 80
+
+kubectl apply -f green-deployment.yml
+
+5. Test the green environment
+
+  kubectl get pods
+
+  curl <GREEN_POD_IP>
+
+6. Edit the svc to redirect traffic to the new environment
+
+  kubectl edit service bluegreen-test-svc
+
+* Change the value to the color label in the selector
+  color: green
+
+  kubectl get svc bluegreen-test
+
+  curl <CLUSTER_IP>
+
+
+Canary deployment
+
+1. Create the main-deployment.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: main-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: canary-test
+      environment: main
+  template:
+    metadata:
+      labels:
+        app: canary-test
+        environment: main
+    spec:
+      containers:
+      - name: nginx
+        image: linuxacademycontent/ckad-nginx:1.0.0
+        ports:
+        - containerPort: 80
+
+kubectl apply -f main-deployment.yml
+
+2. Create the canary-test-svc.yml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: canary-test-svc
+spec:
+  selector:
+    app: canary-test
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+
+kubectl apply -f canary-test-svc.yml
+
+3. Get the svc and test
+
+  kubectl get svc canary-test-svc
+
+  curl <CLUSTER_IP> 
+
+4. Create the canary-deployment.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canary-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: canary-test
+      environment: canary
+  template:
+    metadata:
+      labels:
+        app: canary-test
+        environment: canary
+    spec:
+      containers:
+      - name: nginx
+        image: linuxacademycontent/ckad-nginx:canary
+        ports:
+        - containerPort: 80
+
+kubectl apply -f canary-deployment.yml
+
+* The way we manage to set a small portion of the app is with the replicas, in the main env there were 3 replicas and in the canary there is only one so it will be a small portion will be redirected to the canary replica.
+
+5. Test the svc
+
+  kubectl get svc canary-test-svc
+
+  while true; do curl <CLUSTER_IP>; sleep 3; done
+
+Exam Tips
+----------
+
+Tip 1: You can use multiple Deployments to set up blue/green environments in Kubernets.
+
+Tip 2: Use labels and selectors on Services to direct user traffic to different Pods.
+
+Tip 3: A simple way to set up a canary environment in Kubernetes is to use a Service that selects Pods from 2 different Deployments. Vary the number of replicas to direct fewer users to the canary environment.
+
+====
+Installing Helm
+===================
+
+What is Helm
+-------------
+
+Helm is a package management tool for applications that run in Kubernetes. It allows you to easily install software in your cluster, alongside the necesarry Kubernetes configuration.
+
+Hands-On Demo
+--------------
+
+Install Helm
+
+1. Set up Helm package repo
+
+ curl https://baltocdn.com/helm/signing.ac | sudo apt-key add -
+
+2. Add the repo
+
+ echo "deb https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+
+3. Update packages
+
+ sudo apt-get update
+
+4. Install helm
+
+ sudo apt-get install -y helm
+
+
+====
+Using Helm
+=============
+
+Helm Charts
+------------
+
+A Helm Chart is a Helm software package. It contains all of the Kubernetes resource definitions needed to get the application up and running in the cluster.
+
+What is a Helm Repo
+--------------------
+
+A Helm Repository is a collection of available Charts. You can use it to browse and download Charts before installing them in your cluster
+
+Hands-On Demo
+--------------
+
+1. Add a Helm repository
+
+ helm repo add bitnami https://charts.bitnami.com/bitnami
+
+2. Search bitnami repo
+
+ helm search repo bitnami
+
+3. Create a new namespace (best practice)
+
+ kubectl create namespace dokuwiki
+
+4. Install bitnami documentation tool
+
+ helm install --set-persistence.enabled=false -n namespace app-name repository
+
+ helm install --set-persistence.enabled=false -n dokuwiki  dokuwiki bitnami/dokuwiki
+
+5. Get the pods and etc
+
+ kubectl get pods -dokuwiki
+
+ kubectl get deployment -n dokuwiki
+
+ kubectl get svc -n dokuwiki
+
+6. Uninstall a packgae
+
+ helm uninstall -n dokuwiki dokuwiki
+
+ kubectl delete namespace dokuwiki
+
+Exam Tips
+----------
+
+Tip 1: Helm Charts are packages that contain all of the resource definitions needed to get an application up and running in a cluster.
+
+Tip 2: A Helm Repository is a collection of Charts and a source for browsing and downloading them.

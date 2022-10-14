@@ -1,0 +1,27 @@
+CKAD
+
+The certified Kubernetes Application Developer exam certifies that users can design, build, configue, and expose cloud-native applications for Kubernetes.
+
+Major Concepts
+-----------------
+
+1. Design and Building Applications
+
+We will explore how to use Kubernetes to meet challenges related to how applications are designed to work behind the scense.
+
+2. Deployment
+
+We will look into various tools and strategies that can help us get new code into our Kubernetes environment.
+
+3. Observavility and Maintenance
+
+We will examine various ways of gathering information about our applications and troubleshooting issues.
+
+4. Environment, Configuration, and Security
+
+We will dive into the features in Kubernetes that can help us configure and secure applications.
+
+5. Sevices and Networking
+
+We will discuss how Kubernetes facilitates network communication with our application components.
+

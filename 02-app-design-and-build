@@ -1,0 +1,653 @@
+Application Design and Build
+
+=========
+Building Container Images
+===============================
+
+What is a Container Image?
+----------------------------
+
+An image is a lightweight, standalone file that contains the software and executable needed to run a container.
+
+Once you package your application into an image, you can use it to run any number of containers!
+
+The Role of Docker and the Dockerfile
+---------------------------------------
+
+Docker is one tool that you can use to create your own images.
+
+A Dockerfile defines what is contained in the image.
+
+The docker build command builds an image using the Dockerfile.
+
+
+Hands-On Demo
+-----------------
+
+Set-up docker (in this case control server).
+
+1. Add a group named docker
+
+ sudo groupadd docker
+
+2. Install necessary packages
+
+ sudo apt-get update && sudo apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
+
+3. Add docker gpg
+
+ curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+4. Add the Docker package repo
+
+ echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+5. Install docker
+
+ sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli
+
+6. Verify installation
+
+ sudo docker version
+
+7. Add user to docker group
+
+ sudo usermod -aG docker <user>
+
+Create our own image from an nginx web-server
+
+1. Create the directory my-website
+
+2. Create the file index.html:
+
+Hello, World!
+
+3. Create a Dockerfile
+
+FROM nginx:stable
+
+COPY index.html /usr/share/nginx/html/
+
+4. Build the image
+
+ docker build -t my-website:0.0.1 . 
+
+5. Test image
+
+ docker run --rm --name my-website -d -p 8080:80 my-website:0.0.1
+
+ curl localhost:8080
+
+Save the Image in an archive
+
+ docker save -o /home/<user>/my-website_0.0.1.tar my-website:0.0.1
+
+
+Exam Tips
+------------
+
+Tip 1: Images are files that include all of the software needed to run a container.
+
+Tip 2: A Dockerfile defines the contents of an image.
+
+Tip 3: The docker build command builds an image using a Dockerfile.
+
+========
+Running Jobs and CronJobs
+===============================
+
+What is a Job?
+--------------------
+
+Jobs are designed to run a containerized task successfully to completion.
+
+What is a CronJob?
+--------------------
+
+CronJobs run Jobs periodically according to a schedule.
+
+Hands-On Demo
+---------------
+
+Create a job
+
+1. Create the my-job.yml file
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: my-job
+spec:
+  template:
+    spec:
+      containers:
+      - name: print
+        image: busybox:stable
+        command: ["echo", "This is a test!"]
+      restartPolicy: Never
+  backoffLimit: 4
+  activeDeadlineSeconds: 10
+
+kubectl apply -f my-job.yml
+
+2. Get the jobs
+
+ kubectl get jobs
+
+3. Get the pods
+ 
+ kubectl get pods
+
+4. Get the logs of the pod
+ 
+ kubectl logs <pod_name>
+
+Create a CronJob
+
+1. Create the file my-cronjob.yml
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: my-cronjob
+spec:
+  schedule: "*/1 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: print
+            image: busybox:stable
+            command: ["echo", "This is a test!"]
+          restartPolicy: Never
+      backoffLimit: 4
+      activeDeadlineSeconds: 1
+
+kubectl apply -f my-cronjob.yml
+
+2. Get the CronJobs
+
+ kubectl get cronjob
+
+3. Get the jobs
+
+ kubectl get jobs
+
+Exam Tips
+----------
+
+Tip 1: A Job is designed to run a containerized task successfully to completion.
+
+Tip 2: CronJobs run Jobs periodically according to a schedule.
+
+Tip 3: The restartPolicy for a Job or CronJob Pod must be OnFailure or Never.
+
+Tip 4: Use activeDeadlineSeconds in the Job spec to terminate the Job if it runs too long.
+
+====
+Building Multi-Container Pods
+====================================
+
+What is a Multi-Container Pod?
+--------------------------------
+
+Multi-Container Pods are Pods that include multiple containers that work together.
+
+Multi-Container Design Patterns
+--------------------------------
+
+Sidecar
+
+  · A sidecar container performs a task to assist the main container.
+
+  · Example: The main container serves files from a shared volume. The sidecar periodically updates those files.
+
+Ambassador
+
+  · An ambassador container proxies network traffic to and/or from the main container.
+
+  · Example: The main container reaches out to a Service on port 80, but the port changes to 81. An ambassador container proxies the traffic from port 80 to 81, making it configurable.
+
+Adapter
+
+  · An adapter container transforms the main container's output in some way.
+
+  · Example: The main container outputs log data to the container log in a  non-standard format without timestamps. the adapter tramsforms the data into a stamdard format by adding timestamps.
+
+When to Use Multi-Container Pods
+--------------------------------
+
+Only use multi-container Pods when the containers need to be tightly coupled, sharing resources such as network and storage volumes.
+
+Hands-On Demo
+-------------
+
+Create a SideCar container
+
+1. Create the sidecar-test.yml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sidecar-test
+spec:
+  containers:
+  - name: writer
+    image: busybox:stable
+    command: ['sh', '-c', 'echo "The writer wrote this!" > /output/data.txt; while true; do sleep 5; done']
+    volumeMounts:
+    -  name: shared
+       mountPath: /output
+  - name: sidecar
+    image: busybox:stable
+    command: ['sh', '-c', 'while true; do cat /input/data.txt; sleep 5; done']
+    volumeMounts:
+    - name: shared
+      mountPath: /input
+  volumes:
+  - name: shared
+    emptyDir: {}
+
+kubectl apply -f sidecar-test.yml
+
+2. Get the pods 
+ 
+ kubectl get pod sidecar-test
+
+
+3. Get the logs of both containers
+
+ kubectl logs sidecar-test -c <container_name>
+
+Create an Ambassador container
+
+1. Create ambassador-test-setup.yml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ambassador-test-webserver
+  labels:
+    app: ambassador-test
+spec:
+  containers:
+  - name: nginx
+    image: nginx:stable
+    ports:
+    - containerPort: 80
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: ambassador-test-svc
+spec:
+  selector:
+    app: ambassador-test
+  ports:
+  - protocol: TCP
+    port: 8081
+    targetPort: 80
+
+kubectl apply -f ambassador-test-setup.yml
+
+2. Create the ambassador-test.yml
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-config
+data:
+  haproxy.cfg: |
+    frontend ambassador
+      bind *:8080
+      default_backend ambassador_test_svc
+    backend ambassador_test_svc
+      server svc ambassador-test-svc:8081
+
+---
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ambassador-test
+spec:
+  containers:
+  - name: main
+    image: radial/busyboxplus:curl
+    command: ['sh', '-c', 'while true; do curl localhost:8080; sleep 5; done']
+  - name: ambassador
+    image: haproxy:2.4
+    volumeMounts:
+    - name: config
+      mountPath: /usr/local/etc/haproxy/
+  volumes:
+  - name: config
+    configMap:
+      name: haproxy-config
+
+3. Get the logs
+
+ kubectl logs ammbassador-test -c main
+
+Exam Tips
+----------
+
+Tip 1: A sidecar container performs some task that helps the main container.
+
+Tip 2: An ambassador container proxies network traffic to and/or from the main container.
+
+Tip 3: An adapter container transforms the main container's output
+
+=========
+Using Init Containers
+=========================
+
+What is an Init Container?
+--------------------------
+
+An init container is a container that runs to complete task before a Pod's main container starts up.
+
+Why Use Init Containers?
+-------------------------
+
+Separate Image
+
+ Init containers can use a separate image to perform start-up tasks using software that the main image does not include or need.
+
+Delay Startup
+
+ Init containers can be used to delay startup of the main container until certain preconditions are met.
+
+Security
+
+ Init containers can perform sensitive start-up steps, like consuming secrets, in isolation from the main container.
+
+Hands-On Demo
+--------------
+
+Create An Init Container
+
+1. Create init-test.yml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: init-test
+spec:
+  containers:
+  - name: nginx
+    image: nginx:stable
+  initContainers:
+  - name: busybox
+    image: busybox:stable
+    command: ['sh', '-c', 'sleep 60']
+
+kubectl apply -f init-test.yml
+
+2. Get the pods 
+
+ kubectl get pod init-test
+
+3. Wait for one minute and check again the pods 
+
+Exam Tips
+---------
+
+Tip 1: Init containers run to completion before the main container starts up.
+
+Tip 2: Add init containers using the initContainers field of the PodSpec.
+
+
+=================
+Exploring Volumes
+===============================================
+
+
+What is a Volume?
+------------------
+
+A volume provides external storage for containers outside the container file system.
+
+Volumes and VolumeMounts
+-------------------------
+
+volumes
+ 
+· Defined in the Pod spec.
+· Defines the details of where and how the data is stored.
+
+volumeMounts
+
+· Defined in the container spec.
+· Attaches the volume to a specific container.
+· Defines the path where the volume data will appear at runtime.
+
+
+VolumeTypes
+--------------
+
+The volume type determines where and how data storage is handled.
+
+1. hostPath
+
+ Data is stored in a specific location directly on the host file system, on the Kubernetes node where the Pod is running.
+
+2. emptyDir
+
+ Data is stored in an automatically managed location on the host file system. Data is deleted if the Pod is deleted.
+
+3. persistentVolumeClaim
+
+ Data is stored using a PersistentVolume.
+
+Hands-On Demo
+--------------
+
+hostPath
+
+1. Create text in the worker1 and worker2 servers in /etc/hostPath, "This is worker#!"
+
+ sudo mkdir /etc/hostPath
+ echo "This is worker 1!" | sudo tee /etc/hostPath/data.txt
+
+2. In the control server create hostpath-volume-test.yml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hostpath-volume-test
+spec:
+  restartPolicy: OnFailure
+  containers:
+  - name: busybox
+    image: busybox:stable
+    command: ['sh', '-c', 'cat /data/data.txt']
+    volumeMounts:
+    - name: host-data
+      mountPath: /data
+  volumes:
+  - name: host-data
+    hostPath: /etc/hostPath
+    type: Directory
+
+kubectl apply -f hostpath-volume-test.yml
+
+3. Get the Pods
+ 
+ kubectl get pod hostpath-volume-test
+
+4. Get the logs
+
+ kubectl logs hostpath-volume-test
+
+
+emptyDir Volume
+
+1. Create the emptydir-volume-test.yml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: emptydir-volume-test
+spec:
+  restartPolicy: OnFailure
+    containers:
+  - name: busybox
+    image: busybox:stable
+    command: ['sh', '-c', 'echo "Writting to the empty dir..." > /data/data.txt; cat /data/data.txt']
+    volumeMounts:
+    - name: emptydir-vol
+      mountPath: /data
+  volumes:
+  - name: emptydir-vol
+    emptyDir: {}
+
+kubectl apply -f emptydir-volume-test.yml
+
+2. Get the pods
+
+ kubectl get pod emptydir-volume-test
+
+3. Get the logs
+
+ kubectl logs emptydir-volume-test
+
+Exam Tips
+---------- 	
+
+Tip 1: The volumes field in the Pod spec defines details about volumes used in the Pod.
+
+Tip 2: The volumeMounts field in the container spec mounts a volume to a specific container at a aspecific location.
+
+Tip 3: hostPath volumes mount data from a specific location on the host (k8s node).
+
+Tip 4: hostPath volume types:
+ · Directory - Mounts an existing directory on the host.
+ · DirectoryOrCreate - Mounts a directory on the host, and creates it if it doesn't exist.
+ · File - Mounts an existing single file on the host.
+ · FileOrCreate - Mounts a file on the host, and creates it if it doesn't exist.
+
+Tip 5: emptyDir volumes provide temporary storage that uses the host file system and are removed if the Pod is deleted.
+
+==========
+Using PersistentVolumes
+==============================
+
+What is a PersistentVolume?
+-----------------------------
+
+A PersistentVolume allows you to abstract volume storage details away from Pods and treat storage like a consumable resource.
+
+PersistentVolumes and PersistentvolumeClaims
+------------------------------------------------
+
+PersistentVolume
+
+ · Defines an abstract storage resource ready to be consumed by Pods.
+
+ · Defines details about the type and amount of storage provided.
+
+PersistentVolumeClaim
+
+ · Defines a request for storage, including details on the type of storage needed.
+
+ · Automatically binds to an available PersistentVolume that meets the provided requirements.
+
+ · Mounted in a Pod like any Volume
+
+Binding
+--------
+
+PersistentVolume Claims (PVC) automatically bind to a PersistentVolume (PV) that meets their criteria.
+
+Ex:
+
+We have two different PV's one with a storageClassName fast and 5Gi and another one with slow and 10 Gi.
+
+We also create a PVC with a storageClassName fast and a minimum requirement of 200Mi so this PVC will use the first PV (5Gi and fast).
+
+Hands-On Demo 
+--------------
+
+Create a persistentVolume and a persistentVolumeClaim
+
+1. Create the hostpath-pv.yml
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: hostpath-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: slow
+  hostPath:
+    path: /etc/hostPath
+    type: Directory
+
+kubectl apply -f hostpath-pv.yml
+
+2. Create hostpath-pvc.yml
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hostpath-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 200Mi
+  storageClassName: slow
+
+kubectl apply -f hostpath-pvc.yml
+
+3. Get the pvc's
+
+kubectl get pvc hostpath-pvc
+
+4. Mount the volume in pv-pod-test.yml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pv-pod-test
+spec:
+  restartPolicy: OnFailure
+  containers:
+  - name: busybox
+    image: busybox:stable
+    command: ['sh', '-c', 'cat /data/data.txt']
+    volumeMounts:
+    - name: pv-host-data
+      mountPath: /data
+  volumes:
+  - name: pv-host-data
+    persistentVolumeClaim:
+      claimName: hostpath-pvc
+
+kubectl apply -f pv-pod-test.yml
+
+5. Get the pods and logs of pv-pod-test
+
+ kubectl get pod pv-pod-test
+ kubectl logs pv-pod-test
+
+Exam Tips
+----------
+
+Tip 1: A PersistentVolume defines a storgae resource.
+
+Tip 2: A persistentVolumeClaim defines a request to consume a storage resource.
+
+Tip 3: PersistentVolumeClaims automatically bind to a PersistentVolume that meets their criteria.
+
+Tip 4: Mount a PersistentVolumeClaim to a container like a regular volume.
+
+
