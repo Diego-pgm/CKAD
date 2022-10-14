@@ -139,11 +139,36 @@ Tip 1: Liveness probes check if a container is healthy so that it can be restart
 
 Tip 2: Readiness probes check whether a container is fully started up and ready to be used.
 
-Tip 3: Probes can run a command inside the container, make an HTTP request, or attempt a TCP socket connection to determine container status.
+Tip 3: Probes can run a command inside the container, make an HTTP request, or attempt a TCP socket connection to determine container status.	
 
 ===
 Monitoring Kubernetes Applications
 ====================================
+
+What is Monitoring?
+--------------------
+
+Monitoring is the process of gathering data (metrics)
+ about the performance of your containerized applications.
+
+Accessing Metrics in Kubernetes
+--------------------------------
+
+Steps to Access Data with the Metrics API:
+
+- Install Metrics Server: This is a component that gathers the metric data so that we can access it. Without Metrics Server, the Metrics API will not provide any data.
+
+- Access metric data: The kubectl top command can be used to view metric data once it is gathered by Metrics Server.
+
+Hands-On Demo
+--------------
+
+Install the monitoring tool
+
+kubectl apply -f https://raw.githubusercontent.com/ACloudGuru-Resources/content-cka-resources/master/metrics-server-components.yaml
+
+Exam Tips
+----------
 
 ====
 Accessing Container Logs
