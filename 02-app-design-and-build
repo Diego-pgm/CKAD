@@ -470,8 +470,9 @@ spec:
       mountPath: /data
   volumes:
   - name: host-data
-    hostPath: /etc/hostPath
-    type: Directory
+    hostPath: 
+      path: /etc/hostPath
+      type: Directory
 
 kubectl apply -f hostpath-volume-test.yml
 
