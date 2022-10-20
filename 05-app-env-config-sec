@@ -656,4 +656,4 @@ Tip 2: Set the container's user ID (UID) and group ID (GID) with securityContext
 
 Tip 3: Enable or disable privilege escalarion with securityContext.allowPrivilegeEscalation.
 
-Tip 4: Make the container root filesystem read-only with securityContext.readOnlyRootFilesystem.
+Tip 4: Make the container root filesystem read-only with securityContext.readOnlyRootFilesystem.	

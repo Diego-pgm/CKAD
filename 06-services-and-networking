@@ -1,0 +1,444 @@
+Services and Networking
+========================
+
+Controlling Network Access with NetworkPolicies - Part 1
+=========================================================
+
+Kubernetes Networking
+----------------------
+
+The Kubernetes cluster uses a virtual network to allow Pods to communicate with one another seamlessly, even if they are on different nodes.
+
+---
+What is a NetworkPolicy?
+-------------------------
+
+A NetworkPolicy is a Kubernetes object that allows you to restrict network traffic to and from Pods within the cluster network.
+
+Use NetworPolicies to block unnecessary or unexpected network traffic and make your applications more secure.
+
+---
+Isolated vs Non-Isolated Pods
+------------------------------
+
+Non-Isolated  Pods
+
+· Any Pod that is not selected by any NetworkPolicies.
+
+· Open to all incoming and outgoing network traffic (NetworkPolicies don't apply).
+
+Isolated Pods
+
+· Any Pod that is selected by at least 1 NetworkPolicy.
+
+· Only open to traffic that is explicitly allowd by a NetworkPolicy that selects the Pod.
+
+---
+Hands-On Demo
+--------------
+
+Create NetworkPolicies
+
+1. Create a new namespaces
+
+  kubectl create namespace np-test-a
+
+  kuebctl create namespace np-test-b
+
+2. Attach labels to that namespaces
+
+  kubectl label namespace np-test-a team=ateam
+
+  kubectl label namespace np-test-b team=bteam
+
+3. Create a Server Pod (recieve network communication) server-pod.yml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: server-pod
+  namespace: np-test-a
+  labels:
+    app: np-test-server
+spec:
+  containers:
+  - name: nginx
+    image: nginx:stable
+    ports:
+    - containerPort: 80
+
+kuebctl apply -f server-pod.yml
+
+4. Get additional info
+
+  kubectl get pods server-pod -n np-test-a -o wide
+
+5. Create a client-pod.yml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: client-pod
+  namespace: np-test-b
+  labels:
+    app: np-test-client
+spec:
+  containers:
+  - name: busybox
+    image: radial/busyboxplus:curl
+    command: ['sh', '-c', 'while true; do curl -m <server Pod IP address>; sleep 5; done']
+
+kubectl apply -f client-pod.yml
+
+6. Get the logs of the client pod
+
+  kubectl logs client-pod -n np-test-b
+
+7. Limit the networking access to all the namespace a network traffic np-test-a-default-deny-ingress.yml
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np-test-a-default-deny-ingress
+  namespace: np-test-a
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+
+kubectl apply -f np-test-a-dedfault-deny-ingress.yml
+
+8. Check the logs of the clien pod
+
+  kubectl logs -n np-test-b client-pod
+
+---
+Exam Tips
+----------
+
+Tip 1: If a Pod is not selected by any NetworkPolicies, the Pod is non-isolated, and all traffic is allowed.
+
+Tip 2: If a Pod is selected by any NetworkPolicy, traffic will be blocked unless it is allowed by at least 1 NetworkPolicy that selects the Pod.
+
+Tip 3: If you combine a namespaceSelector and a podSelector within the same rule, the traffic must meeth both the Pod- and Namespace-related conditions in order to be allowed.
+
+===
+Controlling Network Access with NetworkPolicies - Part 2
+=========================================================
+
+Hands-On Demo
+--------------
+
+1. Allow communication from the client Pod np-test-client-allow.yml
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np-test-client-allow
+  namespace: np-test-a
+spec:
+  podSelector:
+    matchLabels:
+      app: np-test-server
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          team: bteam
+      podSelector:
+        matchLabels:
+          app: np-test-client
+    ports:
+    - protocol: TCP
+      port: 80
+
+kubectl apply -f np-test-client-allow.yml
+
+2. Get the clients logs
+
+  kubectl logs -n np-test-b client-pod
+
+3. Create a Egress Policy np-test-b-default-deny-egress.yml
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np-test-b-default-deny-egress
+  namespace: np-test-b
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+
+kubectl apply -f np-test-b-default-deny-egress
+
+4. Check the clients pod logs again.
+
+5. Create a policy that allows egress np-test-client-allow-egress.yml
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np-test-client-allow-egress
+  namespace: np-test-b
+spec:
+  podSelector:
+    matchLabels:
+      app: np-test-client
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          team: ateam
+    ports:
+    - protocol: TCP
+      port: 80
+
+kubectl apply -f np-test-client-allow-egress.yml
+
+6. Check the client pod logs again. *It should be allowed
+
+---
+Exam Tips
+----------
+
+Tip 1: Even if a NetworkPolicy allows outgoing traffic from the source Pod, NetworkPolicies could still block the same traffic when it is incoming to the destination Pod.
+
+===
+Exploring Services
+===================
+
+What is a Service?
+-------------------
+
+A Service allows you to expose an application running across multiple Pods to the network.
+
+Clients can communicate with the Service, and the traffic will be automatically routed to one of the underlying pods.
+
+---
+Service Types
+---------------
+
+A ClusterIP Service exposes the application within the cluster network where it can be accessed by other Pods.
+
+A NodePort Service exposes the application externally by listening on an external port on each cluster node.
+
+---
+Hands-On Demo
+--------------
+
+Lets check out some Services!!!
+
+1. Create a Pod svc-server-pod.yml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: svc-server-pod
+  labels:
+    app: svc-server
+spec:
+  containers:
+  - name: nginx
+    image: nginx:stable
+    ports:
+    - containerPort: 80
+
+kubectl apply -f svc-server-pod.yml
+
+2. Create a ClusterIP service clusterip-svc.yml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: clusterip-svc
+spec:
+  type: ClusterIP
+  selector:
+    app: svc-server
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 80
+
+kubectl apply -f clusterip-svc.yml
+
+3. Interact with the services
+
+  kubectl get svc
+
+4. Get the contents (inside the k8s cluster).
+
+* In the control plane node:
+  curl <svc IP>:8080
+ 
+5. Create a NodePort svc nodeport-svc.yml
+
+apiVersion: v1
+kind: Service
+metadata: 
+  name: nodeport-svc
+spec:
+  type: NodePort
+  selector:
+    app: svc-server
+  ports:
+    - protocol: TCP
+      port: 8080
+      nodePort: 30080
+
+kubectl apply -f nodeport-svc.yml
+
+6. Get the contents inside and outside the cluster
+
+In control plane:
+
+  curl localhost:30080
+
+In the browser
+
+  <external control plane IP>:30080
+
+---
+Exam Tips
+----------
+
+Tip 1: Services allow you to expose an application running in multiple Pods.
+
+Tip 2: ClusterIP Services expose the Pods to other applications within the cluster.
+
+Tip 3: NodePort Services expose the Pods externally using a port that listens on every node in the cluster.
+
+===
+Exposing Applications with Ingress
+===================================
+
+What Is an Ingress
+-------------------
+
+An Ingress is a Kubernetes object that manages access to Services from outside the cluster.
+
+For example, you can use an Ingress to provide your end users with access to your web application running in Kubernetes.
+
+---
+Ingress Routing
+----------------
+
+An Ingress routes traffic to a Service, which then routes the traffic to a Pod.
+
+Note: You need an Ingress controller to actually implement the Ingress functionality.
+
+---
+Hands-On Demo
+--------------
+Lets create an Ingress!!
+
+1. Create the pod ingress-test-pod.yml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ingress-test-pod
+  labels:
+    app: ingress-test
+spec:
+  containers:
+  - name: nginx
+    image: nginx:stable
+    ports:
+    - containerPort: 80
+
+kubectl apply -f ingress-test-pod.yml
+
+2. Create an Ingress Svc ingress-test-svc.yml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-test-service
+spec:
+  type: ClusterIP
+  selector:
+    app: ingress-test
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+
+kubectl apply -f ingress-test-svc.yml
+
+3. Test the page
+
+  curl <ingress svc ip>
+
+4. Create the Ingress ingress-test-ingress.yml
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-test-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: ingresstest.acloud.guru
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ingress-test-svc
+            port:
+              number: 80
+
+kubectl apply -f ingress-test-ingress.yml
+
+5. Describe the Ingress
+
+  kubectl describe ingress ingress-test-ingress
+
+* Install an ingress controller with Helm
+
+1. Add the repo 
+
+  helm repo add nginx-stable https://helm.nginx.com/stable
+
+2. Update the repo
+ 
+  helm repo update
+
+3. Create a new namespace
+
+  kubectl create namespace: nginx-ingress
+
+4. Install the package
+
+  helm install nginx-ingress nginx-stable/nginx-ingress -n nginx-ingress
+
+5. In order to interact get the IP of the Ingress controller Service
+
+  kubectl get svc nginx-ingress-nginx-ingress -n nginx-ingress
+
+6. Modify the hosts file 
+
+  sudo vi /etc/hosts
+
+  <ingress IP> ingresstest.acloud.guru
+
+7. Test
+
+  curl ingresstest.acloud.guru
+
+---
+Exam Tips
+----------
+
+Tip 1: An Ingress manages external access to Kubernetes applications.
+
+Tip 2: An Ingress routes to 1 or more Kubernetes Services.
+
+Tip 3: You need an Ingress controller to implement the Ingress functionality. Which controller you use determines the specifics of how the Ingress will work.
