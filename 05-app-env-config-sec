@@ -591,3 +591,69 @@ Tip 3: Data from both ConfigMaps and Secrets can be passed to containers using e
 ===
 Configuring SecurityContext for Containers
 ===========================================
+
+What is a Security Context?
+----------------------------
+
+A security context is part of the Pod and container spec. It allows you to control advanced security related settings for containers.
+
+---
+Examples of Security Context Settings
+--------------------------------------
+
+These are only a few of the things you can do with security context.
+
+1. User ID and Group ID
+  You can customize the user ID (UID) and/or group ID (GID)
+  used by the container process.
+
+2. Allow Privilege Escalation
+  You can enable or disable privilege escalation for the container process.
+
+3. Read-Only Root Filesystem
+  You can set the container's root filesystem to read-only.
+
+---
+Hands-On Demo
+--------------
+
+Create a Security Context for a container
+
+1. Create the securitycontext-pod.yml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: securitycontext-pod
+spec:
+  containers:
+  - name: busybox
+    image: busybox:stable
+    command: ['sh', '-c', 'while true; do echo Running...; sleep 5 done']
+    securityContext:
+      runAsUser: 3000
+      runAsGroup: 4000
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+
+kubectl apply -f securitycontext-pod.yml
+
+2. Get the user id inside the container
+
+  kubectl exec securitycontext-pod -- id
+
+3. Try to write a file
+
+  kubectl exec securitycontext-pod -- sh -c "echo test > test.txt"
+
+---
+Exam Tips
+----------
+
+Tip 1: A container's security context allows you to control advanced securitu-related settings for the container.
+
+Tip 2: Set the container's user ID (UID) and group ID (GID) with securityContext.runAsUser and securityContext.runAsGroup.
+
+Tip 3: Enable or disable privilege escalarion with securityContext.allowPrivilegeEscalation.
+
+Tip 4: Make the container root filesystem read-only with securityContext.readOnlyRootFilesystem.
